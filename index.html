@@ -2,49 +2,295 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Mini App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Report Wallet</title>
+    <!-- Официальный SDK Telegram -->
     <script src="https://telegram.org"></script>
     <style>
+        :root {
+            --tg-theme-bg-color: #ffffff;
+            --tg-theme-text-color: #000000;
+            --tg-theme-hint-color: #707579;
+            --tg-theme-link-color: #2481cc;
+            --tg-theme-button-color: #2481cc;
+            --tg-theme-button-text-color: #ffffff;
+            --tg-theme-secondary-bg-color: #f4f4f5;
+            --accent-green: #34c759;
+            --accent-red: #ff3b30;
+        }
+
+        /* Стилизация под темную тему Wallet, если Telegram в Dark Mode */
+        html.dark-mode {
+            --tg-theme-bg-color: #1c1c1e;
+            --tg-theme-text-color: #ffffff;
+            --tg-theme-hint-color: #8e8e93;
+            --tg-theme-secondary-bg-color: #2c2c2e;
+        }
+
         body {
-            font-family: sans-serif;
-            background-color: var(--tg-theme-bg-color, #ffffff);
-            color: var(--tg-theme-text-color, #000000);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+            margin: 0;
+            padding: 16px;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Главный баланс в стиле Wallet */
+        .balance-container {
+            text-align: center;
+            margin: 24px 0;
+        }
+        .balance-label {
+            font-size: 14px;
+            color: var(--tg-theme-hint-color);
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+        .balance-amount {
+            font-size: 40px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        /* Блок быстрых круглых кнопок действий */
+        .actions-row {
+            display: flex;
+            justify-content: center;
+            gap: 32px;
+            margin-bottom: 32px;
+        }
+        .action-button-wrapper {
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-        }
-        button {
-            padding: 12px 24px;
-            background-color: var(--tg-theme-button-color, #2481cc);
-            color: var(--tg-theme-button-text-color, #ffffff);
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
             cursor: pointer;
+        }
+        .action-icon-circle {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background-color: var(--tg-theme-button-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8px;
+            transition: opacity 0.2s;
+        }
+        .action-icon-circle:active {
+            opacity: 0.7;
+        }
+        .action-icon-circle svg {
+            width: 22px;
+            height: 22px;
+            fill: var(--tg-theme-button-text-color);
+        }
+        .action-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--tg-theme-link-color);
+        }
+
+        /* Списки транзакций / отчетов */
+        .section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--tg-theme-hint-color);
+            margin-bottom: 12px;
+            padding-left: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .list-card {
+            background-color: var(--tg-theme-secondary-bg-color);
+            border-radius: 14px;
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(128, 128, 128, 0.1);
+        }
+        .list-item:last-child {
+            border-bottom: none;
+        }
+        .item-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-grow: 1;
+        }
+        .item-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .icon-income { background-color: rgba(52, 199, 89, 0.15); color: var(--accent-green); }
+        .icon-expense { background-color: rgba(255, 59, 48, 0.15); color: var(--accent-red); }
+        
+        .item-details {
+            display: flex;
+            flex-direction: column;
+        }
+        .item-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .item-date {
+            font-size: 13px;
+            color: var(--tg-theme-hint-color);
+            margin-top: 2px;
+        }
+        .item-right {
+            text-align: right;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .amount-plus { color: var(--accent-green); }
+        .amount-minus { color: var(--tg-theme-text-color); }
+
+        /* Всплывающее нативное окно добавления отчета */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: flex-end;
+        }
+        .modal-content {
+            background-color: var(--tg-theme-bg-color);
+            width: 100%;
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            padding: 24px 16px;
+            padding-bottom: max(24px, env(safe-area-inset-bottom));
+            box-sizing: border-box;
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        .input-group {
+            margin-bottom: 16px;
+        }
+        .input-group label {
+            display: block;
+            font-size: 13px;
+            color: var(--tg-theme-hint-color);
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(128, 128, 128, 0.2);
+            background-color: var(--tg-theme-secondary-bg-color);
+            color: var(--tg-theme-text-color);
+            font-size: 16px;
+            box-sizing: border-box;
+            outline: none;
+        }
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--tg-theme-button-color);
+            color: var(--tg-theme-button-text-color);
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
         }
     </style>
 </head>
 <body>
-    <h1 id="user-greeting">Привет!</h1>
-    <button onclick="clickAction()">Нажми меня</button>
+
+    <!-- Блок баланса -->
+    <div class="balance-container">
+        <div class="balance-label">Общий баланс отчетности</div>
+        <div class="balance-amount" id="totalBalance">0.00 ₽</div>
+    </div>
+
+    <!-- Кнопки быстрых действий как в Wallet -->
+    <div class="actions-row">
+        <div class="action-button-wrapper" onclick="openModal('income')">
+            <div class="action-icon-circle">
+                <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            </div>
+            <div class="action-label">Доход</div>
+        </div>
+        <div class="action-button-wrapper" onclick="openModal('expense')">
+            <div class="action-icon-circle">
+                <svg viewBox="0 0 24 24"><path d="M19 13H5v-2h14v2z"/></svg>
+            </div>
+            <div class="action-label">Расход</div>
+        </div>
+    </div>
+
+    <!-- Список последних отчетов -->
+    <div class="section-title">Последние операции</div>
+    <div class="list-card" id="transactionsList">
+        <!-- Сюда JS будет добавлять строки автоматически -->
+    </div>
+
+    <!-- Модальное окно создания записи -->
+    <div class="modal" id="reportModal" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="section-title" id="modalTitle" style="margin-bottom: 20px; font-size: 18px; color: var(--tg-theme-text-color)">Новая запись</div>
+            <input type="hidden" id="reportType">
+            
+            <div class="input-group">
+                <label>Сумма (₽)</label>
+                <input type="number" id="reportAmount" placeholder="0.00" inputmode="decimal">
+            </div>
+            <div class="input-group">
+                <label>Категория / Описание</label>
+                <input type="text" id="reportCategory" placeholder="Например: Продажи товаров, Аренда">
+            </div>
+            
+            <button class="submit-btn" onclick="saveReport()">Добавить</button>
+        </div>
+    </div>
 
     <script>
+        // Инициализация Telegram WebApp API
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
 
-        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-            document.getElementById('user-greeting').innerText = `Привет, ${tg.initDataUnsafe.user.first_name}!`;
+        // Синхронизация темы оформления с Telegram
+        if (tg.colorScheme === 'dark') {
+            document.documentElement.classList.add('dark-mode');
         }
 
-        function clickAction() {
-            tg.HapticFeedback.impactOccurred('medium');
-            tg.showAlert('Кнопка сработала! Вибрация пошла.');
-        }
-    </script>
-</body>
-</html>
+        // Временная база данных в памяти устройства (localStorage)
+        let reports = JSON.parse(localStorage.getItem('tg_reports')) || [
+            { id: 1, type: 'income', amount: 45000, category: 'Выплата по договору', date: 'Сегодня, 14:20' },
+            { id: 2, type: 'expense', amount: 12000, category: 'Закупка материалов', date: 'Вчера, 18:05' }
+        ];
+
+        function updateUI() {
+            const listContainer = document.getElementById('transactionsList');
+            const totalBalanceEl = document.getElementById('totalBalance');
+            listContainer.innerHTML = '';
+            
+            let total = 0;
+
+            reports.forEach(item => {
+                if(item.type === 'income') total += item.amount;
+                else total -= item.amount;
+
